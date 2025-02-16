@@ -245,6 +245,7 @@ App.prototype.doReset = function () {
     this.doDictionary(null);
 
     this.state.dictionaryUrl = localStorage.getItem(`dictionaryUrl`);
+    dictionaryUrl.value = this.state.dictionaryUrl;
 };
 
 App.prototype.qs = function (q) {

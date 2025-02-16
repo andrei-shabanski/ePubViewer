@@ -57,6 +57,7 @@ let App = function (el) {
     this.qs("button.prev").addEventListener("click", () => this.state.rendition.prev());
     this.qs("button.next").addEventListener("click", () => this.state.rendition.next());
     this.qs("button.open").addEventListener("click", () => this.doOpenBook());
+    this.qs(".dictionary-wrapper").addEventListener("click", () => this.doDictionary(null));
 
     try {
         this.qs(".bar .loc").style.cursor = "pointer";
@@ -242,6 +243,8 @@ App.prototype.doReset = function () {
     this.qs(".bar button.prev").classList.add("hidden");
     this.qs(".bar button.next").classList.add("hidden");
     this.doDictionary(null);
+
+    this.state.dictionaryUrl = localStorage.getItem(`dictionaryUrl`);
 };
 
 App.prototype.qs = function (q) {
@@ -394,19 +397,23 @@ App.prototype.onRenditionClick = function (event) {
 };
 
 App.prototype.onRenditionDisplayedTouchSwipe = function (event) {
+    console.log('onRenditionDisplayedTouchSwipe')
     let start = null
     let end = null;
-    const el = event.document.documentElement;
+    const el = event.document;
+    console.log(el)
 
     el.addEventListener('touchstart', event => {
+        console.log('touchstart')
         start = event.changedTouches[0];
     });
     el.addEventListener('touchend', event => {
+        console.log('touchend')
         end = event.changedTouches[0];
 
         let hr = (end.screenX - start.screenX) / el.getBoundingClientRect().width;
         let vr = (end.screenY - start.screenY) / el.getBoundingClientRect().height;
-
+        console.log(hr, vr)
         if (hr > vr && hr > 0.25) return this.state.rendition.prev();
         if (hr < vr && hr < -0.25) return this.state.rendition.next();
         if (vr > hr && vr > 0.25) return;
@@ -521,21 +528,23 @@ App.prototype.prepareSelectableContent = function () {
         c.document.querySelectorAll('p').forEach(p => {
             const doc = nlp(p.textContent)
             const frags = doc.document.map((seg) => {
-                console.log('seg', seg)
-                return seg
+                const text = seg
                     .map((s) => {
-                        if (s.tags.intersection(IGNORE_TAGS).size > 0) {
-                            return `${s.pre}${s.text}${s.post}`
-                        }
-                        return `${s.pre}<span title="${JSON.stringify(s).replace(/"/g, "&quot;")}" class="selectable-word">${s.text}</span>${s.post}`
+                        return `${s.pre}${s.text}${s.post}`
                     })
-                    .join('')
+                    .join('');
+                return `<span class="sentence">${text}</span>`
             })
             const html = frags.join('')
             p.innerHTML = html
         })
     });
 };
+
+App.prototype.setDictionaryUrl = function(key) {
+    this.state.dictionaryUrl = key;
+    localStorage.setItem(`dictionaryUrl`, this.state.dictionaryUrl);
+}
 
 App.prototype.onRenditionRelocatedUpdateIndicators = function (event) {
     try {
@@ -642,20 +651,54 @@ App.prototype.checkDictionary = function () {
 };
 
 App.prototype.checkDictionary2 = function (event) {
-    console.log('click')
-    event.preventDefault();
-
-    const p = event.target.closest('.selectable-word');
+    const span = event.target.closest('span');
 
     try {
-        if (!p) {
+        if (!span) {
             if (this.state.showDictTimeout) window.clearTimeout(this.state.showDictTimeout);
             this.doDictionary(null);
             return;
         }
+
+
+        var selection = event.view.getSelection();
+        if (!selection || selection.rangeCount < 1) return true;
+        var range = selection.getRangeAt(0);
+        var node = selection.anchorNode;
+        var word_regexp = /^\w*$/;
+
+        // Extend the range backward until it matches word beginning
+        while ((range.startOffset > 0) && range.toString().match(word_regexp)) {
+            range.setStart(node, (range.startOffset - 1));
+        }
+        // Restore the valid word match after overshooting
+        if (!range.toString().match(word_regexp)) {
+            range.setStart(node, range.startOffset + 1);
+        }
+
+        // Extend the range forward until it matches word ending
+        while ((range.endOffset < node.length) && range.toString().match(word_regexp)) {
+            range.setEnd(node, range.endOffset + 1);
+        }
+        // Restore the valid word match after overshooting
+        if (!range.toString().match(word_regexp)) {
+            range.setEnd(node, range.endOffset - 1);
+        }
+
+        var word = range.toString();
+
+
+        const doc = nlp(span.innerText)
+        const context = doc.document.map(seg => seg
+            .map((s) => {
+                return `${s.pre}${s.text}${s.post}`
+            })
+            .join('')).join('')
+
+
         this.state.showDictTimeout = window.setTimeout(() => {
             try {
-                this.doDictionary(p.innerText);
+                this.doDictionary2(word, {context});
             } catch (err) {console.error(`showDictTimeout: ${err.toString()}`)}
         }, 300);
     } catch (err) {console.error(`checkDictionary: ${err.toString()}`)}
@@ -747,6 +790,83 @@ App.prototype.doDictionary = function (word) {
             lmeaningsEl.innerText = err.toString();
         } catch (err) {}
     });
+};
+
+App.prototype.doDictionary2 = function (word, {context}) {
+    if (this.state.lastWord) if (this.state.lastWord == word) return;
+    this.state.lastWord = word;
+
+    if (!this.qs(".dictionary-wrapper").classList.contains("hidden")) console.log("hide dictionary");
+    this.qs(".dictionary-wrapper").classList.add("hidden");
+    this.qs(".dictionary").innerHTML = "";
+    if (!word) return;
+
+    console.log(`define ${word}`);
+    this.qs(".dictionary-wrapper").classList.remove("hidden");
+    this.qs(".dictionary").innerHTML = "";
+
+    let ldefinitionEl = this.qs(".dictionary").appendChild(document.createElement("div"));
+    ldefinitionEl.classList.add("definition");
+
+    let lwordEl = ldefinitionEl.appendChild(document.createElement("div"));
+    lwordEl.classList.add("word");
+    lwordEl.innerText = word;
+
+    let lmeaningsEl = ldefinitionEl.appendChild(document.createElement("div"));
+    lmeaningsEl.classList.add("meanings");
+    lmeaningsEl.innerHTML = "Loading";
+
+
+    Promise.all([
+        fetch(this.state.dictionaryUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "text": word,
+                "context": context
+            })
+        }).then(r => r.json()),
+        fetch(this.state.dictionaryUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "text": context
+            })
+        }).then(r => r.json()),
+    ]).then(t => {
+        const translation = t.map(r => r.translations[0].text)
+
+        ldefinitionEl.parentElement.removeChild(ldefinitionEl);
+
+        let definitionEl = this.qs(".dictionary").appendChild(document.createElement("div"));
+        definitionEl.classList.add("definition");
+
+        let lwordEl = definitionEl.appendChild(document.createElement("div"));
+        lwordEl.classList.add("word");
+        lwordEl.innerText = word;
+
+        let meaningsEl = definitionEl.appendChild(document.createElement("div"));
+        meaningsEl.classList.add("meanings");
+
+        translation.map((meaning, i) => {
+            let meaningEl = meaningsEl.appendChild(document.createElement("div"));
+            meaningEl.classList.add("meaning");
+
+            let meaningTextEl = meaningEl.appendChild(document.createElement("div"));
+            meaningTextEl.classList.add("text");
+            meaningTextEl.innerText = `${i + 1}. ${meaning}`;
+        });
+
+    }).catch(err => {
+        console.error("dictLookup", err);
+        lmeaningsEl.innerText = err.toString();
+    })
 };
 
 App.prototype.doFullscreen = () => {

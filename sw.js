@@ -19,7 +19,8 @@ self.addEventListener('fetch', event => {
     if (
         event.request.url.startsWith(self.location.origin) || 
         event.request.url.match(/fonts.(googleapis|gstatic).com/) || 
-        event.request.url.match(/dict.api.pgaskin.net/)
+        event.request.url.match(/dict.api.pgaskin.net/) ||
+        event.request.url.match(/on.aws/)
 /* Cache first: */
     ) event.respondWith(
         caches.open(`${cachePrefix}-${revision}`).then(

@@ -121,9 +121,10 @@ App.prototype.doBook = function (url, opts) {
 
     this.state.rendition.hooks.content.register(this.applyTheme.bind(this));
     this.state.rendition.hooks.content.register(this.loadFonts.bind(this));
+    this.state.rendition.hooks.content.register(this.prepareSelectableContent.bind(this));
 
     this.state.rendition.on("relocated", this.onRenditionRelocated.bind(this));
-    this.state.rendition.on("click", this.onRenditionClick.bind(this));
+    // this.state.rendition.on("click", this.onRenditionClick.bind(this));
     this.state.rendition.on("keyup", this.onKeyUp.bind(this));
     this.state.rendition.on("displayed", this.onRenditionDisplayedTouchSwipe.bind(this));
     this.state.rendition.on("relocated", this.onRenditionRelocatedUpdateIndicators.bind(this));
@@ -134,7 +135,7 @@ App.prototype.doBook = function (url, opts) {
     this.state.rendition.display();
 
     if (this.state.dictInterval) window.clearInterval(this.state.dictInterval);
-    this.state.dictInterval = window.setInterval(this.checkDictionary.bind(this), 50);
+    this.state.dictInterval = null;  // window.setInterval(this.checkDictionary.bind(this), 50);
     this.doDictionary(null);
 };
 
@@ -481,6 +482,61 @@ App.prototype.loadFonts = function() {
     });
 };
 
+
+const IGNORE_TAGS = new Set([
+  'Determiner',
+  'Value',
+  'Date',
+  'Currency',
+  'Abbreviation',
+  'Url',
+  'HashTag',
+  'PhoneNumber',
+  'AtMention',
+  'Emoji',
+  'Emoticon',
+  'Email',
+])
+
+App.prototype.prepareSelectableContent = function () {
+    this.state.rendition.getContents().forEach(c => {
+
+        const style = c.document.createElement('style')
+        style.textContent = `
+        .selectable-word {
+            background-color: #fff3cd !important;
+            cursor: pointer !important;
+        }
+        
+        .selectable-word:hover {
+            background-color: #ffe69c !important;
+        }
+        `
+        c.document.head.appendChild(style);
+
+        c.document.addEventListener('click', (event) => {
+            this.checkDictionary2(event);
+        });
+
+        c.document.querySelectorAll('p').forEach(p => {
+            const doc = nlp(p.textContent)
+            const frags = doc.document.map((seg) => {
+                console.log('seg', seg)
+                return seg
+                    .map((s) => {
+                        if (s.tags.intersection(IGNORE_TAGS).size > 0) {
+                            return `${s.pre}${s.text}${s.post}`
+                        }
+                        return `${s.pre}<span title="${JSON.stringify(s).replace(/"/g, "&quot;")}" class="selectable-word">${s.text}</span>${s.post}`
+                    })
+                    .join('')
+            })
+            const html = frags.join('')
+            p.innerHTML = html
+        })
+    });
+};
+
 App.prototype.onRenditionRelocatedUpdateIndicators = function (event) {
     try {
         if (this.getChipActive("progress") == "bar") {
@@ -580,6 +636,26 @@ App.prototype.checkDictionary = function () {
             try {
                 let newSelection = this.state.rendition.manager.getContents()[0].window.getSelection().toString().trim();
                 if (newSelection == selection) this.doDictionary(newSelection);
+            } catch (err) {console.error(`showDictTimeout: ${err.toString()}`)}
+        }, 300);
+    } catch (err) {console.error(`checkDictionary: ${err.toString()}`)}
+};
+
+App.prototype.checkDictionary2 = function (event) {
+    console.log('click')
+    event.preventDefault();
+
+    const p = event.target.closest('.selectable-word');
+
+    try {
+        if (!p) {
+            if (this.state.showDictTimeout) window.clearTimeout(this.state.showDictTimeout);
+            this.doDictionary(null);
+            return;
+        }
+        this.state.showDictTimeout = window.setTimeout(() => {
+            try {
+                this.doDictionary(p.innerText);
             } catch (err) {console.error(`showDictTimeout: ${err.toString()}`)}
         }, 300);
     } catch (err) {console.error(`checkDictionary: ${err.toString()}`)}

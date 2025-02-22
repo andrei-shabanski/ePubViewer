@@ -686,10 +686,45 @@ App.prototype.checkDictionary2 = function (event) {
             range.setEnd(node, range.endOffset - 1);
         }
 
-        var word = range.toString();
+        let word = range.toString();
 
 
         const doc = nlp(span.innerText)
+
+        let unionDocSegments = doc.document.reduce((acc, value) => acc.concat(value), []);
+
+
+        let segmentIter = unionDocSegments[Symbol.iterator]();
+        const wordSeg = segmentIter.find(seg => seg.text === word);
+        if (wordSeg && wordSeg.tags.has('PhrasalVerb')) {
+            let wordSegs = [wordSeg];
+            if (wordSeg.tags.has('Particle')) {
+                segmentIter = Object.values(unionDocSegments).reverse()[Symbol.iterator]()
+                segmentIter.find(x=> x == wordSeg)
+                while (true) {
+                    const prevWordSeg = segmentIter.next()?.value;
+                    if (!prevWordSeg || !prevWordSeg.tags.has('PhrasalVerb')) {
+                        break;
+                    }
+                    wordSegs.unshift(prevWordSeg);
+                }
+            } else {
+                while (true) {
+                    const nextWordSeg = segmentIter.next()?.value;
+                    if (!nextWordSeg || !nextWordSeg.tags.has('PhrasalVerb')) {
+                        break;
+                    }
+                    wordSegs.push(nextWordSeg);
+                }
+            }
+
+            if (wordSegs.length > 1) {
+                word = wordSegs
+                    .reduce((acc,seg) => { return `${acc}${seg.pre}${seg.text}${seg.post}`; }, '')
+                    .trim()
+            }
+        }
+
         const context = doc.document.map(seg => seg
             .map((s) => {
                 return `${s.pre}${s.text}${s.post}`

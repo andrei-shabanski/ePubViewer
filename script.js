@@ -127,7 +127,7 @@ App.prototype.doBook = function (url, opts) {
     this.state.rendition.on("relocated", this.onRenditionRelocated.bind(this));
     // this.state.rendition.on("click", this.onRenditionClick.bind(this));
     this.state.rendition.on("keyup", this.onKeyUp.bind(this));
-    this.state.rendition.on("displayed", this.onRenditionDisplayedTouchSwipe.bind(this));
+    this.state.rendition.on("rendered", this.onRenditionDisplayedTouchSwipe.bind(this));
     this.state.rendition.on("relocated", this.onRenditionRelocatedUpdateIndicators.bind(this));
     this.state.rendition.on("relocated", this.onRenditionRelocatedSavePos.bind(this));
     this.state.rendition.on("started", this.onRenditionStartedRestorePos.bind(this));
@@ -397,11 +397,11 @@ App.prototype.onRenditionClick = function (event) {
     }
 };
 
-App.prototype.onRenditionDisplayedTouchSwipe = function (event) {
+App.prototype.onRenditionDisplayedTouchSwipe = function (event, view) {
     console.log('onRenditionDisplayedTouchSwipe')
     let start = null
     let end = null;
-    const el = event.document;
+    const el = view.document.documentElement;
     console.log(el)
 
     el.addEventListener('touchstart', event => {
@@ -412,13 +412,18 @@ App.prototype.onRenditionDisplayedTouchSwipe = function (event) {
         console.log('touchend')
         end = event.changedTouches[0];
 
-        let hr = (end.screenX - start.screenX) / el.getBoundingClientRect().width;
-        let vr = (end.screenY - start.screenY) / el.getBoundingClientRect().height;
-        console.log(hr, vr)
-        if (hr > vr && hr > 0.25) return this.state.rendition.prev();
-        if (hr < vr && hr < -0.25) return this.state.rendition.next();
-        if (vr > hr && vr > 0.25) return;
-        if (vr < hr && vr < -0.25) return;
+        try {
+            let hr = (end.screenX - start.screenX) / el.getBoundingClientRect().width;
+            let vr = (end.screenY - start.screenY) / el.getBoundingClientRect().height;
+            console.log(hr, vr)
+            if (hr > vr && hr > 0.25) return this.state.rendition.prev();
+            if (hr < vr && hr < -0.25) return this.state.rendition.next();
+            if (vr > hr && vr > 0.25) return this.state.rendition.prev();
+            if (vr < hr && vr < -0.25) return this.state.rendition.next();
+        }
+        catch (e) {
+            console.error(e)
+        }
     });
 };
 

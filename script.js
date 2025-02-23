@@ -402,7 +402,12 @@ App.prototype.onRenditionDisplayedTouchSwipe = function (event, view) {
     let start = null
     let end = null;
     const el = view.document.documentElement;
-    console.log(el)
+    
+    el.addEventListener("touchmove", event => {
+        if (start && start.clientY < 50 && event.touches[0].clientY > start.clientY) {
+            event.preventDefault();
+        }
+    }, { passive: false });
 
     el.addEventListener('touchstart', event => {
         console.log('touchstart')
@@ -412,10 +417,15 @@ App.prototype.onRenditionDisplayedTouchSwipe = function (event, view) {
         console.log('touchend')
         end = event.changedTouches[0];
 
+        const clientRect = event.target.closest('body').getBoundingClientRect()
+
         try {
-            let hr = (end.screenX - start.screenX) / el.getBoundingClientRect().width;
-            let vr = (end.screenY - start.screenY) / el.getBoundingClientRect().height;
-            console.log(hr, vr)
+            let hr = (end.clientX - start.clientX) / clientRect.width;
+            let vr = (end.clientY - start.clientY) / clientRect.height;
+            console.log(`x[${end.clientX}, ${start.clientX}] -- y[${end.screenY}, ${start.screenY}]`)
+            console.log(clientRect)
+            console.log(hr, vr);
+            
             if (hr > vr && hr > 0.25) return this.state.rendition.prev();
             if (hr < vr && hr < -0.25) return this.state.rendition.next();
             if (vr > hr && vr > 0.25) return this.state.rendition.prev();

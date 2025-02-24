@@ -18,7 +18,7 @@ window.onerror = function (msg, url, line, column, err) {
     document.querySelector(".app .error .error-description").innerHTML = "Please try reloading the page or using a different browser (Chrome or Firefox), and if the error still persists, <a href=\"https://github.com/pgaskin/ePubViewer/issues\">report an issue</a>.";
     document.querySelector(".app .error .error-info").innerHTML = msg;
     document.querySelector(".app .error .error-dump").innerHTML = JSON.stringify({
-        error: err.toString(),
+        error: err?.toString() ?? '',
         stack: err.stack,
         msg: msg,
         url: url,
@@ -415,11 +415,12 @@ App.prototype.onRenditionDisplayedTouchSwipe = function (event, view) {
     });
     el.addEventListener('touchend', event => {
         console.log('touchend')
-        end = event.changedTouches[0];
-
-        const clientRect = event.target.closest('body').getBoundingClientRect()
 
         try {
+            end = event.changedTouches[0];
+            
+            const clientRect = event.target.closest('body').getBoundingClientRect()
+
             let hr = (end.clientX - start.clientX) / clientRect.width;
             let vr = (end.clientY - start.clientY) / clientRect.height;
             console.log(`x[${end.clientX}, ${start.clientX}] -- y[${end.screenY}, ${start.screenY}]`)

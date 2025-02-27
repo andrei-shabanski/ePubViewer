@@ -140,6 +140,143 @@ App.prototype.doBook = function (url, opts) {
     this.doDictionary(null);
 };
 
+App.prototype.storeFileHandle = function(fileHandle) {
+    return new Promise((resolve, reject) => {
+      // Always request to upgrade the DB to ensure our object store exists
+      const request = indexedDB.open('BookReaderDB', 2); // Increment version to force upgrade
+      
+      request.onupgradeneeded = function(event) {
+        console.log("Upgrading database...");
+        const db = event.target.result;
+        
+        // Check if the object store exists before creating it
+        if (!db.objectStoreNames.contains('fileHandles')) {
+          console.log("Creating object store 'fileHandles'");
+          db.createObjectStore('fileHandles', { keyPath: 'id' });
+        }
+      };
+      
+      request.onsuccess = function(event) {
+        const db = event.target.result;
+        try {
+          const transaction = db.transaction(['fileHandles'], 'readwrite');
+          const store = transaction.objectStore('fileHandles');
+          
+          const storeRequest = store.put({ id: 'lastBook', handle: fileHandle });
+          
+          storeRequest.onsuccess = function() {
+            console.log("File handle stored successfully");
+            resolve();
+          };
+          
+          storeRequest.onerror = function(error) {
+            console.error("Error storing file handle:", error);
+            reject(error);
+          };
+        } catch (err) {
+          console.error("Transaction error:", err);
+          reject(err);
+        }
+      };
+      
+      request.onerror = function(error) {
+        console.error("Database error:", error);
+        reject(error);
+      };
+    });
+  };
+  
+  App.prototype.getStoredFileHandle = function() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('BookReaderDB', 2); // Match version from above
+      
+      request.onupgradeneeded = function(event) {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('fileHandles')) {
+          db.createObjectStore('fileHandles', { keyPath: 'id' });
+        }
+      };
+      
+      request.onsuccess = function(event) {
+        const db = event.target.result;
+        try {
+          // Check if the object store exists
+          if (!db.objectStoreNames.contains('fileHandles')) {
+            console.log("Object store 'fileHandles' doesn't exist");
+            resolve(null);
+            return;
+          }
+          
+          const transaction = db.transaction(['fileHandles'], 'readonly');
+          const store = transaction.objectStore('fileHandles');
+          
+          const getRequest = store.get('lastBook');
+          
+          getRequest.onsuccess = function() {
+            if (getRequest.result) {
+              console.log("Retrieved file handle");
+              resolve(getRequest.result.handle);
+            } else {
+              console.log("No stored file handle found");
+              resolve(null);
+            }
+          };
+          
+          getRequest.onerror = function(error) {
+            console.error("Error retrieving file handle:", error);
+            reject(error);
+          };
+        } catch (err) {
+          console.error("Transaction error:", err);
+          reject(err);
+        }
+      };
+      
+      request.onerror = function(error) {
+        console.error("Database error:", error);
+        reject(error);
+      };
+    });
+  };
+  
+  App.prototype.reopenLastBook = async function() {
+    try {
+      const fileHandle = await this.getStoredFileHandle();
+      
+      if (!fileHandle) {
+        console.log("No saved file handle");
+        return false;
+      }
+      
+      try {
+        const arrayBuffer = await fileHandle.arrayBuffer();
+        
+        // Check header
+        const arr = (new Uint8Array(arrayBuffer)).subarray(0, 2);
+        let header = "";
+        for (let i = 0; i < arr.length; i++) {
+          header += arr[i].toString(16);
+        }
+        
+        if (header == "504b") {
+          this.doBook(arrayBuffer, {
+            encoding: "binary"
+          });
+          return true;
+        } else {
+          this.fatal("invalid file", "not an epub book");
+          return false;
+        }
+      } catch (err) {
+        console.error("Error accessing file:", err);
+        return false;
+      }
+    } catch (err) {
+      console.error("Error reopening book:", err);
+      return false;
+    }
+  };
+
 App.prototype.loadSettingsFromStorage = function () {
     ["theme", "font", "font-size", "line-spacing", "margin", "progress"].forEach(container => this.restoreChipActive(container));
 };
@@ -186,6 +323,8 @@ App.prototype.doOpenBook = function () {
                 header += arr[i].toString(16);
             }
             if (header == "504b") {
+                this.storeFileHandle(fi.files[0]);
+                
                 this.doBook(reader.result, {
                     encoding: "binary"
                 });
@@ -1001,6 +1140,7 @@ let ePubViewer = null;
 
 try {
     ePubViewer = new App(document.querySelector(".app"));
+    ePubViewer.reopenLastBook ();
     let ufn = location.search.replace("?", "") || location.hash.replace("#", "");
     if (ufn.startsWith("!")) {
         ufn = ufn.replace("!", "");

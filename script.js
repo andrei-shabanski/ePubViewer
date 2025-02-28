@@ -94,6 +94,10 @@ let App = function (el) {
         throw err;
     }
     this.applyTheme();
+
+    this.swipeProgress = document.querySelector('.swipe-progress');
+    this.swipeProgressLeft = document.querySelector('.swipe-progress.left');
+    this.swipeProgressRight = document.querySelector('.swipe-progress.right');
 };
 
 App.prototype.doBook = function (url, opts) {
@@ -536,40 +540,75 @@ App.prototype.onRenditionClick = function (event) {
     }
 };
 
+App.prototype.updateSwipeProgress = function (progress, direction) {
+    // const barWidth = progress * 50; 
+    // this.swipeProgressLeft.style.left = `-${100-barWidth}%`;
+    // this.swipeProgressRight.style.right = `${barWidth-100}%`;
+
+    const barWidth = progress * 100; 
+    if (direction == 'prev') {
+        this.swipeProgressLeft.style.left = `-${100-barWidth}%`;
+        this.swipeProgressRight.style.right = '-100%';
+    } else {
+        this.swipeProgressLeft.style.left = `-100%`;
+        this.swipeProgressRight.style.right = `${barWidth-100}%`;
+    }
+};
+
 App.prototype.onRenditionDisplayedTouchSwipe = function (event, view) {
     console.log('onRenditionDisplayedTouchSwipe')
     let start = null
     let end = null;
     const el = view.document.documentElement;
-    
+
     el.addEventListener("touchmove", event => {
-        if (start && start.clientY < 50 && event.touches[0].clientY > start.clientY) {
-            event.preventDefault();
+        event.preventDefault();
+
+        try {
+            const touch = event.touches[0];
+            // const clientRect = event.target.closest('body').getBoundingClientRect()
+            // 
+            // let hr = (touch.clientX - start.clientX) / clientRect.width;
+            // let vr = (touch.clientY - start.clientY) / clientRect.height;
+            let hr = touch.clientX - start.clientX;
+            let vr = touch.clientY - start.clientY;
+
+            const maxR = Math.max(Math.abs(hr), Math.abs(vr))
+            const direction = maxR === Math.abs(hr) 
+                ? (hr > 0 ? 'prev' : 'next') 
+                : (vr > 0 ? 'next' : 'prev');
+            const progress = Math.min(maxR / 100, 1);
+            this.updateSwipeProgress(progress, direction);
+        } catch (e) {
+            console.error(e);
+            this.updateSwipeProgress(0);
         }
+        
     }, { passive: false });
 
     el.addEventListener('touchstart', event => {
-        console.log('touchstart')
         start = event.changedTouches[0];
+        
+        this.updateSwipeProgress(0);
     });
+
     el.addEventListener('touchend', event => {
-        console.log('touchend')
+        this.updateSwipeProgress(0);
 
         try {
             end = event.changedTouches[0];
-            
-            const clientRect = event.target.closest('body').getBoundingClientRect()
 
-            let hr = (end.clientX - start.clientX) / clientRect.width;
-            let vr = (end.clientY - start.clientY) / clientRect.height;
-            console.log(`x[${end.clientX}, ${start.clientX}] -- y[${end.screenY}, ${start.screenY}]`)
-            console.log(clientRect)
-            console.log(hr, vr);
-            
-            if (hr > vr && hr > 0.25) return this.state.rendition.prev();
-            if (hr < vr && hr < -0.25) return this.state.rendition.next();
-            if (vr > hr && vr > 0.25) return this.state.rendition.prev();
-            if (vr < hr && vr < -0.25) return this.state.rendition.next();
+            // const clientRect = event.target.closest('body').getBoundingClientRect()
+            //
+            // let hr = (end.clientX - start.clientX) / clientRect.width;
+            // let vr = (end.clientY - start.clientY) / clientRect.height;
+            let hr = end.clientX - start.clientX;
+            let vr = end.clientY - start.clientY;
+
+            if (hr > vr && hr > 100) return this.state.rendition.prev();
+            if (hr < vr && hr < -100) return this.state.rendition.next();
+            if (vr > hr && vr > 100) return this.state.rendition.prev();
+            if (vr < hr && vr < -100) return this.state.rendition.next();
         }
         catch (e) {
             console.error(e)

@@ -665,3 +665,21 @@
 .app .hidden {
     display: none !important;
 }
+
+.swipe-progress {
+    position: fixed;
+    bottom: 0;
+    height: 4px;
+    width: 100%;
+    background: #1e83d2;
+    transition: width 0.1s ease;
+    z-index: 1000;
+}
+
+.swipe-progress.left {
+    left: -100%;
+}
+
+.swipe-progress.right {
+    right: -100%;
+}

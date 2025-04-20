@@ -57,7 +57,10 @@ let App = function (el) {
     this.qs("button.prev").addEventListener("click", () => this.state.rendition.prev());
     this.qs("button.next").addEventListener("click", () => this.state.rendition.next());
     this.qs("button.open").addEventListener("click", () => this.doOpenBook());
-    this.qs(".dictionary-wrapper").addEventListener("click", () => this.doDictionary(null));
+    this.qs(".dictionary-wrapper").addEventListener("click", (event) => {
+        if (event.target.closest('[data-target]')) return;
+        this.doDictionary(null);
+    });
 
     try {
         this.qs(".bar .loc").style.cursor = "pointer";
@@ -98,6 +101,8 @@ let App = function (el) {
     this.swipeProgress = document.querySelector('.swipe-progress');
     this.swipeProgressLeft = document.querySelector('.swipe-progress.left');
     this.swipeProgressRight = document.querySelector('.swipe-progress.right');
+
+    this.definitionTemplate = document.querySelector('#definition');
 };
 
 App.prototype.doBook = function (url, opts) {
@@ -1046,6 +1051,51 @@ App.prototype.doDictionary2 = function (word, {context}) {
     lmeaningsEl.classList.add("meanings");
     lmeaningsEl.innerHTML = "Loading";
 
+    let definitionEl = this.definitionTemplate.content.cloneNode(true);
+
+    definitionEl.querySelector('[data-target="audio-gb"]').onclick = (event) => {
+        if (this.selectedWordAudio) {
+            new Audio(this.selectedWordAudio.gb).play();
+        }
+    };
+    definitionEl.querySelector('[data-target="audio-us"]').onclick = (event) => {
+        if (this.selectedWordAudio) {
+            new Audio(this.selectedWordAudio.us).play();
+        }
+    };
+
+    this.selectedWordAudio = null;
+    fetch(this.state.dictionaryUrl, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            "text": word,
+            "request_audio": true
+        })
+    }).then(r => r.json())
+        .then(data => {
+            this.selectedWordAudio = data.words[Object.keys(data.words)[0]];
+            Object.keys(data.words).forEach(key => {
+                if (key.toLowerCase() === word.toLowerCase()) {
+                    this.selectedWordAudio = data.words[key];
+                }
+            });
+
+            if (this.selectedWordAudio) {
+                definitionEl.querySelector('[data-target="audio-gb"]').style.display = "inline-block";
+                definitionEl.querySelector('[data-target="audio-us"]').style.display = "inline-block";
+            }
+
+            if (data.url) {
+                definitionEl.querySelector('[data-target="def"]').style.display = "inline-block";
+                definitionEl.querySelector('[data-target="def"]').onclick = () => {
+                    window.open(data.url, '_blank').focus();
+                };
+            }
+        });
 
     Promise.all([
         fetch(this.state.dictionaryUrl, {
@@ -1056,7 +1106,7 @@ App.prototype.doDictionary2 = function (word, {context}) {
             },
             body: JSON.stringify({
                 "text": word,
-                "context": context
+                "context": context,
             })
         }).then(r => r.json()),
         fetch(this.state.dictionaryUrl, {
@@ -1070,29 +1120,13 @@ App.prototype.doDictionary2 = function (word, {context}) {
             })
         }).then(r => r.json()),
     ]).then(t => {
-        const translation = t.map(r => r.translations[0].text)
+        definitionEl.querySelector('[data-target="word"]').textContent = word;
+        definitionEl.querySelector('[data-target="meaning-1"]').textContent = `1. ${t[0].translations[0].text}`;
+        definitionEl.querySelector('[data-target="meaning-2"]').textContent = `2. ${t[1].translations[0].text}`;
 
         ldefinitionEl.parentElement.removeChild(ldefinitionEl);
-
-        let definitionEl = this.qs(".dictionary").appendChild(document.createElement("div"));
-        definitionEl.classList.add("definition");
-
-        let lwordEl = definitionEl.appendChild(document.createElement("div"));
-        lwordEl.classList.add("word");
-        lwordEl.innerText = word;
-
-        let meaningsEl = definitionEl.appendChild(document.createElement("div"));
-        meaningsEl.classList.add("meanings");
-
-        translation.map((meaning, i) => {
-            let meaningEl = meaningsEl.appendChild(document.createElement("div"));
-            meaningEl.classList.add("meaning");
-
-            let meaningTextEl = meaningEl.appendChild(document.createElement("div"));
-            meaningTextEl.classList.add("text");
-            meaningTextEl.innerText = `${i + 1}. ${meaning}`;
-        });
-
+        this.qs(".dictionary").appendChild(definitionEl);
+        definitionEl = this.qs(".dictionary .definition")
     }).catch(err => {
         console.error("dictLookup", err);
         lmeaningsEl.innerText = err.toString();

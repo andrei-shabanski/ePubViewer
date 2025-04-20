@@ -231,9 +231,28 @@
     <div class="swipe-progress left"></div>
     <div class="swipe-progress right"></div>
 
+    <template id="definition">
+        <div class="definition">
+            <div class="word">
+                <span data-target="word"></span>
+                <button style="margin-left: 12px; display: none;" data-target="audio-gb">🔊GB</button>
+                <button style="margin-left: 8px; display: none;" data-target="audio-us">🔊US</button>
+                <button style="margin-left: 8px; display: none;" data-target="def">Dict</button>
+            </div>
+            <div class="meanings">
+                <div class="meaning">
+                    <div class="text" data-target="meaning-1"></div>
+                </div>
+                <div class="meaning">
+                    <div class="text" data-target="meaning-2"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <script>
         if ('serviceWorker' in navigator) window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').then(reg => {
+            navigator.serviceWorker.register('sw.js?v29').then(reg => {
                 reg.onupdatefound = () => {
                     const installingWorker = reg.installing;
                     installingWorker.onstatechange = () => {
@@ -258,7 +277,7 @@
     <script defer src="https://unpkg.com/compromise"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
 
-    <script defer src="script.js?v=4"></script>
+    <script defer src="script.js?v29"></script>
 </body>
 
 </html>

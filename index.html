@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>ePubViewer v30</title>
+    <title>ePubViewer v31</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="libs/normalize.min.css">
     <link rel="stylesheet" href="style.css">
@@ -252,7 +252,7 @@
 
     <script>
         if ('serviceWorker' in navigator) window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js?v30').then(reg => {
+            navigator.serviceWorker.register('sw.js?v31').then(reg => {
                 reg.onupdatefound = () => {
                     const installingWorker = reg.installing;
                     installingWorker.onstatechange = () => {
@@ -277,7 +277,7 @@
     <script defer src="https://unpkg.com/compromise"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
 
-    <script defer src="script.js?v30"></script>
+    <script defer src="script.js?v31"></script>
 </body>
 
 </html>

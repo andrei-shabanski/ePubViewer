@@ -1065,16 +1065,20 @@ App.prototype.doDictionary2 = function (word, {context}) {
     };
 
     this.selectedWordAudio = null;
-    fetch(this.state.dictionaryUrl, {
-        method: 'POST',
+    const audioParams = new URLSearchParams({
+        "text": word,
+        "request_audio": true
+    });
+    fetch(this.state.dictionaryUrl + `?${audioParams}`, {
+        method: 'GET',
         headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-            "text": word,
-            "request_audio": true
-        })
+        // body: JSON.stringify({
+        //     "text": word,
+        //     "request_audio": true
+        // })
     }).then(r => r.json())
         .then(data => {
             this.selectedWordAudio = data.words[Object.keys(data.words)[0]];

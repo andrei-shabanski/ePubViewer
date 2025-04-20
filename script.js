@@ -1097,27 +1097,36 @@ App.prototype.doDictionary2 = function (word, {context}) {
             }
         });
 
+    const translation1Params = new URLSearchParams({
+        "text": word,
+        "context": context,
+    });
+
+    const translation2Params = new URLSearchParams({
+        "text": context
+    });
+
     Promise.all([
-        fetch(this.state.dictionaryUrl, {
-            method: 'POST',
+        fetch(this.state.dictionaryUrl + `?${translation1Params}`, {
+            method: 'GET',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                "text": word,
-                "context": context,
-            })
+            // body: JSON.stringify({
+            //     "text": word,
+            //     "context": context,
+            // })
         }).then(r => r.json()),
-        fetch(this.state.dictionaryUrl, {
-            method: 'POST',
+        fetch(this.state.dictionaryUrl + `?${translation2Params}`, {
+            method: 'GET',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                "text": context
-            })
+            // body: JSON.stringify({
+            //     "text": context
+            // })
         }).then(r => r.json()),
     ]).then(t => {
         definitionEl.querySelector('[data-target="word"]').textContent = word;
